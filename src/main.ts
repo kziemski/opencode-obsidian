@@ -16,16 +16,18 @@ export default class OpenCodePlugin extends Plugin {
 
     // Get the vault directory path to pass to OpenCode
     const vaultPath = this.getVaultPath();
+    const projectDirectory = this.getProjectDirectory();
 
-    // Initialize process manager with vault as the project directory
+    // Initialize process manager with vault as the working directory
+    // and either the configured project directory or vault as the project
     this.processManager = new ProcessManager(
       this.settings,
       vaultPath,
-      vaultPath,
+      projectDirectory,
       (state) => this.notifyStateChange(state)
     );
 
-    console.log("[OpenCode] Configured with vault directory:", vaultPath);
+    console.log("[OpenCode] Configured with project directory:", projectDirectory);
 
     // Register the OpenCode view
     this.registerView(OPENCODE_VIEW_TYPE, (leaf) => new OpenCodeView(leaf, this));
@@ -102,6 +104,22 @@ export default class OpenCodePlugin extends Plugin {
     // Update process manager with new settings
     if (this.processManager) {
       this.processManager.updateSettings(this.settings);
+    }
+  }
+
+  // Update project directory and restart server if running
+  async updateProjectDirectory(directory: string): Promise<void> {
+    this.settings.projectDirectory = directory;
+    await this.saveData(this.settings);
+
+    if (this.processManager) {
+      this.processManager.updateProjectDirectory(this.getProjectDirectory());
+
+      // Restart server if it's currently running
+      if (this.getProcessState() === "running") {
+        this.stopServer();
+        await this.startServer();
+      }
     }
   }
 
@@ -193,7 +211,6 @@ export default class OpenCodePlugin extends Plugin {
   }
 
   // Get the vault path - this is the root directory of the Obsidian vault
-  // which will be passed to OpenCode as the project directory
   private getVaultPath(): string {
     const adapter = this.app.vault.adapter as any;
     const vaultPath = adapter.basePath || "";
@@ -201,5 +218,13 @@ export default class OpenCodePlugin extends Plugin {
       console.warn("[OpenCode] Warning: Could not determine vault path");
     }
     return vaultPath;
+  }
+
+  // Get the project directory - uses the configured setting if set, otherwise vault path
+  getProjectDirectory(): string {
+    if (this.settings.projectDirectory) {
+      return this.settings.projectDirectory;
+    }
+    return this.getVaultPath();
   }
 }

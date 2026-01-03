@@ -25,8 +25,12 @@ export class ProcessManager {
     this.onStateChange = onStateChange;
   }
 
-  updateSettings(settings: OpenCodeSettings) {
+  updateSettings(settings: OpenCodeSettings): void {
     this.settings = settings;
+  }
+
+  updateProjectDirectory(directory: string): void {
+    this.projectDirectory = directory;
   }
 
   getState(): ProcessState {

@@ -34,7 +34,8 @@ var DEFAULT_SETTINGS = {
   port: 14096,
   hostname: "127.0.0.1",
   autoStart: false,
-  opencodePath: "opencode"
+  opencodePath: "opencode",
+  projectDirectory: ""
 };
 var OPENCODE_VIEW_TYPE = "opencode-view";
 
@@ -210,9 +211,21 @@ var OpenCodeView = class extends import_obsidian.ItemView {
 
 // src/SettingsTab.ts
 var import_obsidian2 = require("obsidian");
+var import_fs = require("fs");
+var import_os = require("os");
+function expandTilde(path) {
+  if (path === "~") {
+    return (0, import_os.homedir)();
+  }
+  if (path.startsWith("~/")) {
+    return path.replace("~", (0, import_os.homedir)());
+  }
+  return path;
+}
 var OpenCodeSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
+    this.validateTimeout = null;
     this.plugin = plugin;
   }
   display() {
@@ -243,6 +256,18 @@ var OpenCodeSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian2.Setting(containerEl).setName("Project directory").setDesc(
+      "Override the starting directory for OpenCode. Leave empty to use the vault root. Supports ~ for home directory."
+    ).addText(
+      (text) => text.setPlaceholder("/path/to/project or ~/project").setValue(this.plugin.settings.projectDirectory).onChange((value) => {
+        if (this.validateTimeout) {
+          clearTimeout(this.validateTimeout);
+        }
+        this.validateTimeout = setTimeout(async () => {
+          await this.validateAndSetProjectDirectory(value);
+        }, 500);
+      })
+    );
     containerEl.createEl("h3", { text: "Behavior" });
     new import_obsidian2.Setting(containerEl).setName("Auto-start server").setDesc(
       "Automatically start the OpenCode server when Obsidian opens (not recommended for faster startup)"
@@ -255,6 +280,33 @@ var OpenCodeSettingTab = class extends import_obsidian2.PluginSettingTab {
     containerEl.createEl("h3", { text: "Server Status" });
     const statusContainer = containerEl.createDiv({ cls: "opencode-settings-status" });
     this.renderServerStatus(statusContainer);
+  }
+  async validateAndSetProjectDirectory(value) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      await this.plugin.updateProjectDirectory("");
+      return;
+    }
+    if (!trimmed.startsWith("/") && !trimmed.startsWith("~") && !trimmed.match(/^[A-Za-z]:\\/)) {
+      new import_obsidian2.Notice("Project directory must be an absolute path (or start with ~)");
+      return;
+    }
+    const expanded = expandTilde(trimmed);
+    try {
+      if (!(0, import_fs.existsSync)(expanded)) {
+        new import_obsidian2.Notice("Project directory does not exist");
+        return;
+      }
+      const stat = (0, import_fs.statSync)(expanded);
+      if (!stat.isDirectory()) {
+        new import_obsidian2.Notice("Project directory path is not a directory");
+        return;
+      }
+    } catch (error) {
+      new import_obsidian2.Notice(`Failed to validate path: ${error.message}`);
+      return;
+    }
+    await this.plugin.updateProjectDirectory(expanded);
   }
   renderServerStatus(container) {
     container.empty();
@@ -342,6 +394,9 @@ var ProcessManager = class {
   }
   updateSettings(settings) {
     this.settings = settings;
+  }
+  updateProjectDirectory(directory) {
+    this.projectDirectory = directory;
   }
   getState() {
     return this.state;
@@ -500,13 +555,14 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     console.log("Loading OpenCode plugin");
     await this.loadSettings();
     const vaultPath = this.getVaultPath();
+    const projectDirectory = this.getProjectDirectory();
     this.processManager = new ProcessManager(
       this.settings,
       vaultPath,
-      vaultPath,
+      projectDirectory,
       (state) => this.notifyStateChange(state)
     );
-    console.log("[OpenCode] Configured with vault directory:", vaultPath);
+    console.log("[OpenCode] Configured with project directory:", projectDirectory);
     this.registerView(OPENCODE_VIEW_TYPE, (leaf) => new OpenCodeView(leaf, this));
     this.addRibbonIcon("terminal", "OpenCode", () => {
       this.activateView();
@@ -559,6 +615,18 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     await this.saveData(this.settings);
     if (this.processManager) {
       this.processManager.updateSettings(this.settings);
+    }
+  }
+  // Update project directory and restart server if running
+  async updateProjectDirectory(directory) {
+    this.settings.projectDirectory = directory;
+    await this.saveData(this.settings);
+    if (this.processManager) {
+      this.processManager.updateProjectDirectory(this.getProjectDirectory());
+      if (this.getProcessState() === "running") {
+        this.stopServer();
+        await this.startServer();
+      }
     }
   }
   // Get existing view leaf if any
@@ -636,7 +704,6 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     }
   }
   // Get the vault path - this is the root directory of the Obsidian vault
-  // which will be passed to OpenCode as the project directory
   getVaultPath() {
     const adapter = this.app.vault.adapter;
     const vaultPath = adapter.basePath || "";
@@ -644,5 +711,12 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
       console.warn("[OpenCode] Warning: Could not determine vault path");
     }
     return vaultPath;
+  }
+  // Get the project directory - uses the configured setting if set, otherwise vault path
+  getProjectDirectory() {
+    if (this.settings.projectDirectory) {
+      return this.settings.projectDirectory;
+    }
+    return this.getVaultPath();
   }
 };

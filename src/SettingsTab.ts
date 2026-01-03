@@ -1,8 +1,21 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import { existsSync, statSync } from "fs";
+import { homedir } from "os";
 import type OpenCodePlugin from "./main";
+
+function expandTilde(path: string): string {
+  if (path === "~") {
+    return homedir();
+  }
+  if (path.startsWith("~/")) {
+    return path.replace("~", homedir());
+  }
+  return path;
+}
 
 export class OpenCodeSettingTab extends PluginSettingTab {
   plugin: OpenCodePlugin;
+  private validateTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App, plugin: OpenCodePlugin) {
     super(app, plugin);
@@ -62,6 +75,26 @@ export class OpenCodeSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName("Project directory")
+      .setDesc(
+        "Override the starting directory for OpenCode. Leave empty to use the vault root. Supports ~ for home directory."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("/path/to/project or ~/project")
+          .setValue(this.plugin.settings.projectDirectory)
+          .onChange((value) => {
+            // Debounce validation to avoid spamming notices on every keypress
+            if (this.validateTimeout) {
+              clearTimeout(this.validateTimeout);
+            }
+            this.validateTimeout = setTimeout(async () => {
+              await this.validateAndSetProjectDirectory(value);
+            }, 500);
+          })
+      );
+
     // Behavior settings section
     containerEl.createEl("h3", { text: "Behavior" });
 
@@ -84,6 +117,44 @@ export class OpenCodeSettingTab extends PluginSettingTab {
 
     const statusContainer = containerEl.createDiv({ cls: "opencode-settings-status" });
     this.renderServerStatus(statusContainer);
+  }
+
+  private async validateAndSetProjectDirectory(value: string): Promise<void> {
+    const trimmed = value.trim();
+
+    // Empty value is valid - means use vault root
+    if (!trimmed) {
+      await this.plugin.updateProjectDirectory("");
+      return;
+    }
+
+    // Validate absolute path (supports ~, /, and Windows drive letters)
+    if (!trimmed.startsWith("/") && !trimmed.startsWith("~") && !trimmed.match(/^[A-Za-z]:\\/)) {
+      new Notice("Project directory must be an absolute path (or start with ~)");
+      return;
+    }
+
+    // Expand tilde for validation
+    const expanded = expandTilde(trimmed);
+
+    // Validate path exists and is a directory
+    try {
+      if (!existsSync(expanded)) {
+        new Notice("Project directory does not exist");
+        return;
+      }
+      const stat = statSync(expanded);
+      if (!stat.isDirectory()) {
+        new Notice("Project directory path is not a directory");
+        return;
+      }
+    } catch (error) {
+      new Notice(`Failed to validate path: ${(error as Error).message}`);
+      return;
+    }
+
+    // Store the expanded path
+    await this.plugin.updateProjectDirectory(expanded);
   }
 
   private renderServerStatus(container: HTMLElement): void {
