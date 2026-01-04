@@ -71,19 +71,18 @@ export class ProcessManager {
 
       // Start the opencode serve process (headless server, no browser)
       // OpenCode is initialized with the vault directory as the project
-      console.log("[OpenCode] Starting server with vault:", {
-        vaultDirectory: this.projectDirectory,
-        workingDirectory: this.workingDirectory,
+      console.log("[OpenCode] Starting server:", {
         opencodePath: this.settings.opencodePath,
         port: this.settings.port,
         hostname: this.settings.hostname,
+        cwd: this.workingDirectory,
+        projectDirectory: this.projectDirectory,
       });
 
       this.process = spawn(
         this.settings.opencodePath,
         [
           "serve",
-          this.projectDirectory,
           "--port",
           this.settings.port.toString(),
           "--hostname",

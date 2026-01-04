@@ -439,18 +439,17 @@ var ProcessManager = class {
         this.setState("running");
         return true;
       }
-      console.log("[OpenCode] Starting server with vault:", {
-        vaultDirectory: this.projectDirectory,
-        workingDirectory: this.workingDirectory,
+      console.log("[OpenCode] Starting server:", {
         opencodePath: this.settings.opencodePath,
         port: this.settings.port,
-        hostname: this.settings.hostname
+        hostname: this.settings.hostname,
+        cwd: this.workingDirectory,
+        projectDirectory: this.projectDirectory
       });
       this.process = (0, import_child_process.spawn)(
         this.settings.opencodePath,
         [
           "serve",
-          this.projectDirectory,
           "--port",
           this.settings.port.toString(),
           "--hostname",
