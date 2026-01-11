@@ -94,20 +94,17 @@ export default class OpenCodePlugin extends Plugin {
 
     this.processManager.updateProjectDirectory(this.getProjectDirectory());
 
-    // Restart server if it's currently running
     if (this.getProcessState() === "running") {
       this.stopServer();
       await this.startServer();
     }
   }
 
-  // Get existing view leaf if any
   private getExistingLeaf(): WorkspaceLeaf | null {
     const leaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
     return leaves.length > 0 ? leaves[0] : null;
   }
 
-  // Activate or create the view
   async activateView(): Promise<void> {
     const existingLeaf = this.getExistingLeaf();
 
@@ -133,7 +130,6 @@ export default class OpenCodePlugin extends Plugin {
     }
   }
 
-  // Toggle view visibility
   async toggleView(): Promise<void> {
     const existingLeaf = this.getExistingLeaf();
 

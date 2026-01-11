@@ -21,6 +21,7 @@ function createTestSettings(port: number): OpenCodeSettings {
     opencodePath: "opencode",
     projectDirectory: "",
     startupTimeout: TEST_TIMEOUT_MS,
+    defaultViewLocation: "sidebar",
   };
 }
 
@@ -55,17 +56,16 @@ afterEach(async () => {
 
 describe("ProcessManager", () => {
   describe("happy path", () => {
-    test("starts server and transitions to running state", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
-      const stateHistory: ProcessState[] = [];
+     test("starts server and transitions to running state", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
+       const stateHistory: ProcessState[] = [];
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        (state) => stateHistory.push(state)
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         (state) => stateHistory.push(state)
+       );
 
       expect(currentManager.getState()).toBe("stopped");
 
@@ -77,16 +77,15 @@ describe("ProcessManager", () => {
       expect(stateHistory).toContain("running");
     });
 
-    test("reports correct server URL with encoded project directory", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
+     test("reports correct server URL with encoded project directory", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        () => {}
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         () => {}
+       );
 
       const url = currentManager.getUrl();
       const expectedBase = `http://127.0.0.1:${port}`;
@@ -95,17 +94,16 @@ describe("ProcessManager", () => {
       expect(url).toBe(`${expectedBase}/${expectedPath}`);
     });
 
-    test("stops server gracefully and transitions to stopped state", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
-      const stateHistory: ProcessState[] = [];
+     test("stops server gracefully and transitions to stopped state", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
+       const stateHistory: ProcessState[] = [];
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        (state) => stateHistory.push(state)
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         (state) => stateHistory.push(state)
+       );
 
       await currentManager.start();
       expect(currentManager.getState()).toBe("running");
@@ -116,17 +114,16 @@ describe("ProcessManager", () => {
       expect(stateHistory).toContain("stopped");
     });
 
-    test("state callbacks fire in correct order: starting -> running", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
-      const stateHistory: ProcessState[] = [];
+     test("state callbacks fire in correct order: starting -> running", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
+       const stateHistory: ProcessState[] = [];
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        (state) => stateHistory.push(state)
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         (state) => stateHistory.push(state)
+       );
 
       await currentManager.start();
 
@@ -138,16 +135,15 @@ describe("ProcessManager", () => {
       expect(runningIndex).toBeGreaterThan(startingIndex);
     });
 
-    test("can restart after stop", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
+     test("can restart after stop", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        () => {}
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         () => {}
+       );
 
       // First start
       const firstStart = await currentManager.start();
@@ -167,16 +163,15 @@ describe("ProcessManager", () => {
       expect(currentManager.getState()).toBe("running");
     });
 
-    test("returns true immediately if already running", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
+     test("returns true immediately if already running", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        () => {}
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         () => {}
+       );
 
       // First start
       await currentManager.start();
@@ -198,16 +193,15 @@ describe("ProcessManager", () => {
       expect(stateHistory).toEqual([]);
     });
 
-    test("health check endpoint is accessible when running", async () => {
-      const port = getNextPort();
-      const settings = createTestSettings(port);
+     test("health check endpoint is accessible when running", async () => {
+       const port = getNextPort();
+       const settings = createTestSettings(port);
 
-      currentManager = new ProcessManager(
-        settings,
-        PROJECT_DIR,
-        PROJECT_DIR,
-        () => {}
-      );
+       currentManager = new ProcessManager(
+         settings,
+         PROJECT_DIR,
+         () => {}
+       );
 
       await currentManager.start();
 

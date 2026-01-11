@@ -39,9 +39,8 @@ export class ProcessManager {
   }
 
   getUrl(): string {
-    const baseUrl = `http://${this.settings.hostname}:${this.settings.port}`;
     const encodedPath = btoa(this.projectDirectory);
-    return `${baseUrl}/${encodedPath}`;
+    return `http://${this.settings.hostname}:${this.settings.port}/${encodedPath}`;
   }
 
   async start(): Promise<boolean> {
@@ -57,7 +56,6 @@ export class ProcessManager {
       return this.setError("Project directory (vault) not configured");
     }
 
-    // Check if server is already running on this port
     if (await this.checkServerHealth()) {
       console.log("[OpenCode] Server already running on port", this.settings.port);
       this.setState("running");
@@ -125,19 +123,16 @@ export class ProcessManager {
       }
     });
 
-    // Wait for server to be ready
     const ready = await this.waitForServerOrExit(this.settings.startupTimeout);
     if (ready) {
       this.setState("running");
       return true;
     }
 
-    // If already in error state from spawn error event, don't overwrite
     if (this.state === "error") {
       return false;
     }
 
-    // Determine appropriate error message based on what happened
     this.stop();
     if (this.earlyExitCode !== null) {
       return this.setError(`Process exited unexpectedly (exit code ${this.earlyExitCode})`);
